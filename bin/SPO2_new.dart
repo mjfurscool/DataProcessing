@@ -1,221 +1,6 @@
-import 'dart:ffi';
-import 'dart:typed_data';
-
 import 'package:scidart/numdart.dart';
-import 'package:scidart/scidart.dart';
-import 'package:linalg/linalg.dart';
 import 'package:scidarttest/algorithm/envelope.dart';
-import 'dart:math';
-import 'package:smart_arrays_peaks/smart_arrays_peaks.dart';
-
-class SgFilter {
-  int _order;
-  int _frameLength;
-  int _size;
-  Matrix _kernel;
-
-  /// The constructor for SgFilter
-  /// Arguments:
-  ///   - _order: int, the order of polynomial.
-  ///   - _frameLength: int, the windows size for smoothing.
-  /// Return:
-  ///   - SgFilter
-  SgFilter(this._order, this._frameLength) {
-    _size = _frameLength ~/ 2;
-    _kernel = this._buildKernel();
-  }
-
-  /// Build the kernel for smoothing
-  /// Arguments:
-  ///   - void
-  /// Return:
-  ///   - Matrix: the kernel for smoothing
-  Matrix _buildKernel() {
-    List<double> baseSeq = [];
-    List<List<double>> tempMatrix = [];
-    Matrix matrix;
-    Matrix kernel;
-
-    // construct base sequence
-    for (int i = -_size; i <= _size; i++) {
-      baseSeq.add(i.toDouble());
-    }
-
-    // fill the tempMatrix
-    for (int i = 0; i < _order; i++) {
-      List<double> tempSeq = [];
-
-      // make row
-      for (double val in baseSeq) {
-        tempSeq.add(pow(val, i));
-      }
-
-      // add row
-      tempMatrix.add(tempSeq);
-    }
-
-    // convert List<List<double>> to Matrix
-    matrix = new Matrix(tempMatrix).transpose();
-
-    // Calculate the kernel
-    kernel =
-        matrix * (matrix.transpose() * matrix).inverse() * matrix.transpose();
-
-    return kernel;
-  }
-
-  /// Smooth given data
-  /// Arguments:
-  ///   - x: List<dynamic>, input data, only support int/double type.
-  /// Return:
-  ///   - List<dynamic>: Data after smoothing
-  /// Throws:
-  ///   - FormatException:
-  ///      - if the data type is neither int nor double.
-  ///      - Or the input length < _frameLength
-  List<dynamic> smooth(List<dynamic> x) {
-    List<double> dataAfterSmooth = [];
-    List<double> inputData = [];
-
-    // validate input data
-    if (x.length < _frameLength) {
-      throw FormatException(
-          "The length of input must be >= _frameLength. (_frameLength=$_frameLength; input=${x.length})");
-    }
-    if (x[0].runtimeType != 0.runtimeType &&
-        x[0].runtimeType != 1.0.runtimeType) {
-      throw FormatException(
-          "Only support int/double, get: ${x[0].runtimeType}!");
-    }
-
-    // convert List<int> to List<double> if needed
-    if (x[0].runtimeType == 0.runtimeType) {
-      for (int val in x) {
-        inputData.add(val * 1.0);
-      }
-    } else {
-      inputData = x;
-    }
-
-    // add padding
-    // adding padding in the front
-    for (int i = 0; i < _size; i++) {
-      inputData.insert(0, 1);
-    }
-
-    // adding padding at the end
-    for (int i = 0; i < _size; i++) {
-      inputData.insert(_size - 1, 1);
-    }
-
-    // smoothing input data
-    for (int i = _size; i < inputData.length - _size; i++) {
-      List<List<double>> tempWin = [
-        inputData.sublist(i - _size, i + _size + 1)
-      ];
-      Matrix windowX = new Matrix(tempWin).transpose();
-      dataAfterSmooth.add((_kernel * windowX)[_size][0]);
-    }
-    return dataAfterSmooth;
-  }
-
-  /// getters
-  int get order {
-    return _order;
-  }
-
-  int get frameLength {
-    return _frameLength;
-  }
-
-  Matrix get kernel {
-    return _kernel;
-  }
-}
-
-List linear_interp(double x1, double y1, double x2, double y2) {
-  if (x1 > x2) {
-    // keep x1 smaller than x2.
-    var t;
-    t = x1;
-    x1 = x2;
-    x2 = t;
-
-    t = y1;
-    y1 = y2;
-    y2 = t;
-  }
-  var N = x2 - x1;
-  var x;
-  var y;
-  Array result_y = Array.empty(); //
-  for (int i = 0; i < N; i++) {
-    x = x1 + i;
-    y = (x - x1) * (y2 - y1) / (x2 - x1) + y1;
-    result_y.add(y);
-  }
-  return result_y;
-} //
-
-List findtopPeaks(Array a, {double mindistance}) {
-  //modify from scidart.findPeaks
-  var N = a.length - 2;
-  List ix = []; //ix -- index
-  List ax = []; // ax -- value
-  ix.add(0);
-  ax.add(0);
-  if (mindistance != null) {
-    for (int i = 1; i <= N; i++) {
-      if (a[i - 1] <= a[i] && a[i] >= a[i + 1]) {
-        if (i - ix.last > mindistance) {
-          //mindistance between two peaks
-          ix.add(i.toDouble());
-          ax.add(a[i]);
-        }
-      }
-    }
-  } else {
-    for (int i = 1; i <= N; i++) {
-      if (a[i - 1] <= a[i] && a[i] >= a[i + 1]) {
-        ix.add(i.toDouble());
-        ax.add(a[i]);
-      }
-    }
-  }
-  ix.remove(0);
-  ax.remove(0);
-  return [ix, ax];
-}
-
-List findlowtroughs(Array a, {double mindistance}) {
-  //modify from scidart.findPeaks
-  var N = a.length - 2;
-  List ix = []; //ix -- index
-  List ax = []; // ax -- value
-  ix.add(0);
-  ax.add(0);
-  if (mindistance != null) {
-    for (int i = 1; i <= N; i++) {
-      if (a[i - 1] >= a[i] && a[i] <= a[i + 1]) {
-        if (i - ix.last > mindistance) {
-          //mindistance between two peaks
-          ix.add(i.toDouble());
-          ax.add(a[i]);
-        }
-      }
-    }
-  } else {
-    for (int i = 1; i <= N; i++) {
-      if (a[i - 1] >= a[i] && a[i] <= a[i + 1]) {
-        ix.add(i.toDouble());
-        ax.add(a[i]);
-      }
-    }
-  }
-  ix.remove(0);
-  ax.remove(0);
-  return [ix, ax];
-}
+import 'package:scidarttest/algorithm/sgfilter.dart';
 
 void main() {
   // load RED data -flexboard
@@ -29185,47 +28970,28 @@ void main() {
 
   var sgfiltered_RED = Array(filter1.smooth(RED03));
   var sgfiltered_IR = Array(filter1.smooth(IR03));
-  print(sgfiltered_IR);
+  //print(sgfiltered_IR);
   //var sgfiltered_IR2 = Float64List.fromList(filter1.smooth(IR03));
 
   // ------------------------------------IR signal processing------------------------
-  var pk_IR = findtopPeaks(sgfiltered_IR, mindistance: 5);
-/*   var pk_IR = PeakPicker1D.detectPeaks(sgfiltered_IR2, 0, sgfiltered_IR.length,
-      2.0, 0.0, PeakPicker1D.PICK_POSNEG, 0);
-  var pk_IR_value = [];
-  for (var i = 0; i < pk_IR.length; i++) {
-    pk_IR_value.add(sgfiltered_IR2[pk_IR[i]]);
-  } */
-
-  var troughs_IR = findlowtroughs(sgfiltered_IR, mindistance: 5);
-
-  var pk_RED = findtopPeaks(sgfiltered_RED, mindistance: 45);
-  var troughs_RED = findlowtroughs(sgfiltered_RED, mindistance: 45);
-  //print(pk_IR[0]);
-  //print(pk_IR[1]);
-
-  //print(troughs_IR[0]);
-  //print(troughs_IR[1]);
-
   //enveloping RED
-  var enved_RED = envelope(sgfiltered_RED, 45); //45
+  var enved_RED = envelope(sgfiltered_RED, 5); //45
   var upper_RED = enved_RED[0];
   var lower_RED = enved_RED[1];
   //enveloping IR
-  var enved_IR = envelope(sgfiltered_IR, 45);
+  var enved_IR = envelope(sgfiltered_IR, 5);
   var upper_IR = enved_IR[0];
   var lower_IR = enved_IR[1];
-  //print('----------Upper and lower IR--');
-  //print(upper_IR);
+  //print('----------Upper and lower IR/RED--');
+  //print(upper_RED);
   //print('---------------------------------------------------/n');
-  //print(lower_IR);
+  //print(lower_RED);
 //-----------------------------------calculate parameters for RR and SPO2 ----------------------------------------------
   var pp_RED = new Array(
       Array(upper_RED.cast<double>()) - Array(lower_RED.cast<double>()));
   var pp_IR = new Array(
       Array(upper_IR.cast<double>()) - Array(lower_IR.cast<double>()));
 
-  //print(sgfiltered_RED.length);
   //--------------------------------calculate RR------------------------------------------------
   var RR = (pp_RED / Array(lower_RED.cast<double>())) /
       (pp_IR / Array(lower_IR.cast<double>()));
@@ -29238,5 +29004,5 @@ void main() {
           arrayMultiplyToScalar(RR, 30.354),
       -94.84);
 
-  //print(SPO2);
+  print(SPO2);
 }

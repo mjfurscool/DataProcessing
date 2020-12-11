@@ -1,12 +1,4 @@
-import 'dart:ffi';
-import 'dart:typed_data';
-
 import 'package:scidart/numdart.dart';
-import 'package:scidart/scidart.dart';
-import 'package:linalg/linalg.dart';
-import 'package:scidarttest/algorithm/envelope.dart';
-import 'dart:math';
-import 'package:smart_arrays_peaks/smart_arrays_peaks.dart';
 
 List linear_interp(double x1, double y1, double x2, double y2) {
   if (x1 > x2) {

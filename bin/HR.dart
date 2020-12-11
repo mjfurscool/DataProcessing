@@ -1,163 +1,6 @@
 import 'package:scidart/numdart.dart';
-import 'package:scidart/scidart.dart';
-import 'package:linalg/linalg.dart';
-import 'dart:math';
-
-class SgFilter {
-  int _order;
-  int _frameLength;
-  int _size;
-  Matrix _kernel;
-
-  /// The constructor for SgFilter
-  /// Arguments:
-  ///   - _order: int, the order of polynomial.
-  ///   - _frameLength: int, the windows size for smoothing.
-  /// Return:
-  ///   - SgFilter
-  SgFilter(this._order, this._frameLength) {
-    _size = _frameLength ~/ 2;
-    _kernel = this._buildKernel();
-  }
-
-  /// Build the kernel for smoothing
-  /// Arguments:
-  ///   - void
-  /// Return:
-  ///   - Matrix: the kernel for smoothing
-  Matrix _buildKernel() {
-    List<double> baseSeq = [];
-    List<List<double>> tempMatrix = [];
-    Matrix matrix;
-    Matrix kernel;
-
-    // construct base sequence
-    for (int i = -_size; i <= _size; i++) {
-      baseSeq.add(i.toDouble());
-    }
-
-    // fill the tempMatrix
-    for (int i = 0; i < _order; i++) {
-      List<double> tempSeq = [];
-
-      // make row
-      for (double val in baseSeq) {
-        tempSeq.add(pow(val, i));
-      }
-
-      // add row
-      tempMatrix.add(tempSeq);
-    }
-
-    // convert List<List<double>> to Matrix
-    matrix = new Matrix(tempMatrix).transpose();
-
-    // Calculate the kernel
-    kernel =
-        matrix * (matrix.transpose() * matrix).inverse() * matrix.transpose();
-
-    return kernel;
-  }
-
-  /// Smooth given data
-  /// Arguments:
-  ///   - x: List<dynamic>, input data, only support int/double type.
-  /// Return:
-  ///   - List<dynamic>: Data after smoothing
-  /// Throws:
-  ///   - FormatException:
-  ///      - if the data type is neither int nor double.
-  ///      - Or the input length < _frameLength
-  List<dynamic> smooth(List<dynamic> x) {
-    List<double> dataAfterSmooth = [];
-    List<double> inputData = [];
-
-    // validate input data
-    if (x.length < _frameLength) {
-      throw FormatException(
-          "The length of input must be >= _frameLength. (_frameLength=$_frameLength; input=${x.length})");
-    }
-    if (x[0].runtimeType != 0.runtimeType &&
-        x[0].runtimeType != 1.0.runtimeType) {
-      throw FormatException(
-          "Only support int/double, get: ${x[0].runtimeType}!");
-    }
-
-    // convert List<int> to List<double> if needed
-    if (x[0].runtimeType == 0.runtimeType) {
-      for (int val in x) {
-        inputData.add(val * 1.0);
-      }
-    } else {
-      inputData = x;
-    }
-
-    // add padding
-    // adding padding in the front
-    for (int i = 0; i < _size; i++) {
-      inputData.insert(0, 1);
-    }
-
-    // adding padding at the end
-    for (int i = 0; i < _size; i++) {
-      inputData.add(1);
-    }
-
-    // smoothing input data
-    for (int i = _size; i < inputData.length - _size; i++) {
-      List<List<double>> tempWin = [
-        inputData.sublist(i - _size, i + _size + 1)
-      ];
-      Matrix windowX = new Matrix(tempWin).transpose();
-      dataAfterSmooth.add((_kernel * windowX)[_size][0]);
-    }
-
-    return dataAfterSmooth;
-  }
-
-  /// getters
-  int get order {
-    return _order;
-  }
-
-  int get frameLength {
-    return _frameLength;
-  }
-
-  Matrix get kernel {
-    return _kernel;
-  }
-}
-
-List findtopPeaks(Array a, {double mindistance}) {
-  //modify from scidart.findPeaks
-  var N = a.length - 2;
-  Array ix = Array.empty(); //ix -- index
-  Array ax = Array.empty(); // ax -- value
-  ix.add(0);
-  ax.add(0);
-  if (mindistance != null) {
-    for (int i = 1; i <= N; i++) {
-      if (a[i - 1] <= a[i] && a[i] >= a[i + 1]) {
-        if (i - ix.last > mindistance) {
-          //mindistance between two peaks
-          ix.add(i.toDouble());
-          ax.add(a[i]);
-        }
-      }
-    }
-  } else {
-    for (int i = 1; i <= N; i++) {
-      if (a[i - 1] <= a[i] && a[i] >= a[i + 1]) {
-        ix.add(i.toDouble());
-        ax.add(a[i]);
-      }
-    }
-  }
-  ix.remove(0);
-  ax.remove(0);
-  return [ix, ax];
-}
+import 'package:scidarttest/algorithm/findTopPeaks.dart';
+import 'package:scidarttest/algorithm/sgfilter.dart';
 
 void main() {
   //-------- FIR filter -----------//,
@@ -165,9 +8,8 @@ void main() {
   // a sum of sine waves with 1Hz and 10Hz, 50 samples and,
   // sample frequency (fs) 100Hz,
 
-  var fs = 100;
-
-  var sample_sg = Array([
+  var fs = 100; // collecting frequency may need to be modified
+  var RED03 = Array([
     58534,
     9213,
     25682,
@@ -12643,27 +12485,20 @@ void main() {
 
   SgFilter filter = new SgFilter(4, 11);
 
-  var sgFiltered = Array(filter.smooth(sample_sg));
-  //-------- Digital filter application -----------//,
-  //print('digital filter application');,
-  // Apply the filter on the signal using lfilter function,
-  // lfilter uses direct form II transposed, for FIR filter,
-  // the a coefficient is 1.0,
-  //var sgFiltered = lfilter(b, Array([1.0]), sg);,
-  //var sgFiltered = lfilter(b, Array([1.0]), sample_sg);
-
+  var sgFiltered = Array(filter.smooth(RED03));
+  //print(sgFiltered);
   print('--------peaks-------');
-  var pk = findtopPeaks(sgFiltered, mindistance: 55);
+  var pk = findTopPeaks(sgFiltered, mindistance: 5);
   print(pk[0]); // print the indexes of the peaks found in the signal
   print(pk[1]); // print the values of the peaks found in the signal
 
   //calculate HR
-  var diffArray = arrayDiff(pk[0]);
+  var diffArray = arrayDiff(Array(pk[0].cast<double>()));
   var HRArray = Array([]); //contains HR for each second.
-  print('-----diffArray----');
-  print(diffArray);
+  //print('-----diffArray----');
+  //print(diffArray);
   for (int i = 1; i < diffArray.length; i++) {
-    HRArray.add(100 * 60 / diffArray[i]); //Heart beat perminute
+    HRArray.add(fs * 60 / diffArray[i]); //Heart beat perminute
   }
   print('-----HRArray----');
   print(HRArray);
