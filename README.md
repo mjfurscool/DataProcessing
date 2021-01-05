@@ -1,5 +1,9 @@
-A sample command-line application with an entrypoint in `bin/`, library code
-in `lib/`, and example unit test in `test/`.
+the Processing code is inside the bin folder.
 
-Created from templates made available by Stagehand under a BSD-style
-[license](https://github.com/dart-lang/stagehand/blob/master/LICENSE).
+HR.dart for Heart Rate.
+SPO2_new.dart for blood oxygen saturation.
+RR.dart for respiratory rate.
+
+the lib/algorithm folder contains helper functions.
+
+DataProcessing.dart integrates HR, SPO2, RR Temperature together.
