@@ -77,7 +77,7 @@ List findtopPeaks(List a, {double mindistance}) {
   return [ix_final, ax_final];
 }
 
-List findlowtroughs(Array a, {double mindistance}) {
+List findlowtroughs(List a, {double mindistance}) {
   //modify from scidart.findPeaks
   var N = a.length - 2;
   List ix = []; //ix -- index
